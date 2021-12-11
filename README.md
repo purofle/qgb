@@ -1,2 +1,2 @@
-# qgb
-QQ频道api的Kotlin实现（尚未完善）
+# qq-guild-bot
+一个简单的QQ频道机器人的Kotlin实现。
