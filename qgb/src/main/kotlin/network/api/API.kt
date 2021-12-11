@@ -16,10 +16,11 @@ import okhttp3.Request
 import okhttp3.WebSocketListener
 import xyz.cuya.qgb.context.QGBContext
 import xyz.cuya.qgb.network.data.APIDomain
+import xyz.cuya.qgb.utils.Log
 
 class API(apiDomain: APIDomain) {
-    private val baseURL: String = apiDomain.domain
-    private val client = HttpClient(OkHttp)
+    val baseURL: String = apiDomain.domain
+    val client = HttpClient(OkHttp)
     private val okhttpClient = OkHttpClient.Builder().build()
     private lateinit var wss: String
 
@@ -31,7 +32,18 @@ class API(apiDomain: APIDomain) {
         }
     }
 
-    suspend fun getWSS() {
+    suspend inline fun <reified T> post(api: String, body: Any): T {
+        Log.logger.debug("发送post请求：$body -> $api")
+        return client.post("$baseURL$api") {
+            this.body = body
+            contentType(ContentType.Application.Json)
+            headers {
+                append(HttpHeaders.Authorization, QGBContext.config.bot_token)
+            }
+        }
+    }
+
+    private suspend fun getWSS() {
         Json.decodeFromString<JsonObject>(get("/gateway"))["url"]!!.jsonPrimitive.content.also {
             wss = it
         }

@@ -1,9 +1,13 @@
 package xyz.cuya.qgb.events
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import xyz.cuya.qgb.context.QGBContext
 import xyz.cuya.qgb.entity.Author
 import xyz.cuya.qgb.entity.Member
+import xyz.cuya.qgb.entity.Message
+import xyz.cuya.qgb.utils.JsonUtils.objectToJsonString
 
 @Serializable
 data class AtMessageCreateEvent(
@@ -25,4 +29,9 @@ data class AtMessageCreateEvent(
     val timestamp: String
 ) {
     fun messageContent() = content.replace(Regex("<@!\\d+>"), "")
+    fun reply(body: String) {
+        runBlocking {
+            QGBContext.api.post<String>("/channels/${channel_id}/messages", Message(body, id).objectToJsonString())
+        }
+    }
 }

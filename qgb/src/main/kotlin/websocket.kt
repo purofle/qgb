@@ -16,6 +16,7 @@ import xyz.cuya.qgb.network.data.DispatchEnums.AT_MESSAGE_CREATE
 import xyz.cuya.qgb.network.data.DispatchEnums.READY
 import xyz.cuya.qgb.utils.JsonUtils.objectToJsonString
 import xyz.cuya.qgb.utils.JsonUtils.toJsonObject
+import xyz.cuya.qgb.utils.Log
 import xyz.cuya.qgb.utils.ScheduleUtils
 import java.util.*
 import java.util.concurrent.atomic.AtomicLong
@@ -34,66 +35,71 @@ suspend fun websocket(
         private var sessionId = ""
 
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            println("websocket连接已启动")
+            Log.logger.info("websocket连接已启动")
             isFirstConnect = true
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
-            val n = text.toJsonObject<Operation>()
-            println("RAW：${text}")
+            kotlin.runCatching {
+                val n = text.toJsonObject<Operation>()
+                Log.logger.debug("RAW：${text}")
 
-            when (n.opcode) {
-                OPCode.HeartbeatACK -> {
-                    println("收到ack")
-                    lastReceivedHeartBeat.getAndSet(System.currentTimeMillis())
-                }
-                OPCode.Hello -> {
-                    println("收到hello包")
-                    initWebsocket(webSocket)
-                }
-                OPCode.Dispatch -> {
-                    val dispatch = text.toJsonObject<DispatchType>()
-                    println("收到Dispatch包：$dispatch")
-                    successConnect(dispatch)
-                    when (dispatch.type) {
-                        READY -> {
-                            val data = text.toJsonObject<Dispatch<ReadyEvent>>().d
-                            makeHeartBeat(webSocket)
-                            sessionId = data.session_id
-                            officialEvents.forEach {
-                                runBlocking {
-                                    it.onReady(data)
+                when (n.opcode) {
+                    OPCode.HeartbeatACK -> {
+                        Log.logger.debug("收到ack")
+                        lastReceivedHeartBeat.getAndSet(System.currentTimeMillis())
+                    }
+                    OPCode.Hello -> {
+                        Log.logger.debug("收到hello包")
+                        initWebsocket(webSocket)
+                    }
+                    OPCode.Dispatch -> {
+                        val dispatch = text.toJsonObject<DispatchType>()
+                        Log.logger.debug("收到Dispatch包：$dispatch")
+                        successConnect(dispatch)
+                        when (dispatch.type) {
+                            READY -> {
+                                val data = text.toJsonObject<Dispatch<ReadyEvent>>().d
+                                makeHeartBeat(webSocket)
+                                sessionId = data.session_id
+                                officialEvents.forEach {
+                                    runBlocking {
+                                        it.onReady(data)
+                                    }
                                 }
                             }
-                        }
-                        AT_MESSAGE_CREATE -> {
-                            val data = text.toJsonObject<Dispatch<AtMessageCreateEvent>>().d
-                            officialEvents.forEach {
-                                runBlocking {
-                                    it.onAtMessage(data)
+                            AT_MESSAGE_CREATE -> {
+                                val data = text.toJsonObject<Dispatch<AtMessageCreateEvent>>().d
+                                Log.logger.info("[${data.channel_id}][${data.author.username}] AT:${data.messageContent()}")
+                                officialEvents.forEach {
+                                    runBlocking {
+                                        it.onAtMessage(data)
+                                    }
                                 }
                             }
+                            else -> TODO()
                         }
-                        else -> TODO()
+                    }
+                    else -> {
+                        Log.logger.error("出现未知事件 ${n.opcode} op: ${n.opcode.code}")
+                        QGBContext.websocketJob.complete()
+                        hbTimer?.cancel()
+                        Log.logger.error("协程已完成")
                     }
                 }
-                else -> {
-                    println("出现未知事件 ${n.opcode} op: ${n.opcode.code}")
-                    QGBContext.websocketJob.complete()
-                    hbTimer?.cancel()
-                    println("协程已完成")
-                }
+            }.onFailure {
+                it.printStackTrace()
             }
         }
 
         private fun initWebsocket(webSocket: WebSocket) {
             val identify = Identify(IdentifyData(QGBContext.config.bot_token)).objectToJsonString()
             webSocket.send(identify)
-            println("发送鉴权包")
+            Log.logger.info("发送鉴权包")
         }
 
         private fun makeHeartBeat(webSocket: WebSocket) {
-            println("心跳开始")
+            Log.logger.info("心跳开始")
             lastReceivedHeartBeat.getAndSet(System.currentTimeMillis())
             val processor = createHeartBeatProcessor(webSocket)
             //  先取消以前的定时器
@@ -107,23 +113,22 @@ suspend fun websocket(
                 val last = lastReceivedHeartBeat.get()
                 val now = System.currentTimeMillis()
                 if (now - last > reconnectTimeout) {
-                    println("心跳超时")
+                    Log.logger.error("心跳超时")
                     QGBContext.websocketJob.cancel("超时")
                     hbTimer?.cancel()
-                    println("协程已完成")
+                    Log.logger.error("协程已完成")
                 } else {
                     val hb = Heartbeat(messageSeq.get()).objectToJsonString()
-//                    val hb = Operation(OPCode.Heartbeat).objectToJsonString()
-                    println(webSocket.send(hb))
-                    println("发送心跳 $hb")
+                    webSocket.send(hb)
+                    Log.logger.debug("发送心跳 $hb")
                 }
             }
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            println(t.localizedMessage)
+            Log.logger.error(t.message)
             hbTimer?.cancel()
-            QGBContext.websocketJob.cancel(t.localizedMessage)
+            QGBContext.websocketJob.cancel()
 
         }
 

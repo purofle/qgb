@@ -2,3 +2,4 @@
 .gradle
 build
 qgb/build
+qgb/src/test/kotlin/maintest
