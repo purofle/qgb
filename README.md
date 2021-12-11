@@ -3,10 +3,31 @@
 
 一个简单的QQ频道机器人的Kotlin实现。
 已经实现的功能：
+
+<details>
+    
+- websocket 处理
+- ReadyEvent 处理
+- AT消息处理
+    
+</details>
+
+## 安装
+1.添加`jitpack.io`仓库
+```kotlin
+repositories {
+    maven("https://jitpack.io")
+}
 ```
-AT消息处理
+2.添加依赖
+
+最新版本：![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/purofle/qgb?include_prereleases&style=for-the-badge)
+```kotlin
+dependencies {
+    implementation("com.github.purofle:qgb:最新版本号")
+}
 ```
-使用：
+## 使用
 ```kotlin
 import xyz.cuya.qgb.QGB
 
