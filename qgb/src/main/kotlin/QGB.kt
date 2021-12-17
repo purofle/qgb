@@ -1,5 +1,7 @@
 package xyz.cuya.qgb
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import xyz.cuya.qgb.context.QGBContext
 import xyz.cuya.qgb.events.AtMessageCreateEvent
 import xyz.cuya.qgb.events.BotEvent
@@ -32,7 +34,8 @@ class QGB(
      */
     suspend fun startWebSocket(
         onAtMessageEvent: (AtMessageCreateEvent) -> Unit = {},
-        onReadyEvent: (ReadyEvent) -> Unit = {}
+        onReadyEvent: (ReadyEvent) -> Unit = {},
+        scope: CoroutineScope = CoroutineScope(Dispatchers.IO + QGBContext.websocketJob)
     ) {
         websocket(officialEvents = listOf(object : BotEvent() {
             override suspend fun onAtMessage(data: AtMessageCreateEvent) {
@@ -42,6 +45,6 @@ class QGB(
             override suspend fun onReady(data: ReadyEvent) {
                 onReadyEvent(data)
             }
-        }))
+        }), scope = scope)
     }
 }
